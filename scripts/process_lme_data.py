@@ -85,7 +85,7 @@ def process_lme_member(member, input_variable, input_month, monthly_path, out_pa
                 data_dict[var] = preind_ds[var]
         out_data = xr.Dataset(data_vars=data_dict,
                               coords={"lat":lat, "lon": lon, "time": all_times[valid_months],
-                                      "lev": preind_ds["lev"]})
+                                      "lev": preind_ds["lev"]}, attrs=preind_ds.attrs)
         out_data.to_netcdf(out_filename, encoding={input_variable: {"dtype":"float32", 
                                                                     "zlib": True,
                                                                     "complevel": 2}})
@@ -95,6 +95,21 @@ def process_lme_member(member, input_variable, input_month, monthly_path, out_pa
 
 
 def calc_seasonal_precip(site_lon, site_lat, member, precip_var, precip_months, daily_path, out_path):
+    """
+    Calculate the total precipitation over a set of months at the grid point nearest a specified site.
+
+    Args:
+        site_lon:
+        site_lat:
+        member:
+        precip_var:
+        precip_months:
+        daily_path:
+        out_path:
+
+    Returns:
+
+    """
     preind_run_file = join(daily_path,
                            precip_var,
                            "b.e11.BLMTRC5CN.f19_g16.{0:03d}.cam.h1.{1:s}.08500101-18491231.nc".format(member,
@@ -124,7 +139,11 @@ def calc_seasonal_precip(site_lon, site_lat, member, precip_var, precip_months, 
                                      "month": all_months[valid_months],
                                      precip_var: site_data_mm_day})
         seasonal_precip = daily_precip.groupby("year")[precip_var].sum()
-        out_file = join(out_path, "djf_precip_lme_cam_{0:03d}_{1:s}_0851-2005.csv".format(member, precip_var))
+        month_to_letter = {1: "J", 2: "F", 3: "M", 4: "A", 5: "M", 6: "J",
+                           7: "J", 8: "A", 9: "S", 10: "O", 11: "N", 12: "D"}
+        season_name = "".join([month_to_letter[x] for x in precip_months])
+        out_file = join(out_path, "{0:s}_precip_lme_cam_{1:03d}_{2:s}_0851-2005.csv".format(season_name,
+                                                                                            member, precip_var))
         seasonal_precip.to_csv(out_file, index_label="Year")
     return
 
@@ -160,7 +179,7 @@ def precipitable_water(member, input_month, data_path, out_path, pres_var="PS", 
         pw_ds = xr.Dataset(data_vars=data_dict, coords={"lat": q_ds["lat"],
                                                         "lon": q_ds["lon"],
                                                         "time": q_ds["time"],
-                                                         "lev": q_ds["lev"]})
+                                                         "lev": q_ds["lev"]}, attrs=q_ds.attrs)
         out_filestr = "b.e11.BLMTRC5CN.f19_g16.{0:03d}.cam.h0.{1:s}.0850{2:02d}-2004{2:02d}.nc"
         out_filename = join(out_path,
                             out_filestr.format(member,
@@ -205,7 +224,7 @@ def interp_pressure(interp_var, pressure_levels, member, input_month, data_path,
                     data_dict[var] = i_ds[var]
             out_ds = xr.Dataset(data_vars=data_dict, coords={"lat": i_ds["lat"],
                                                              "lon": i_ds["lon"],
-                                                             "time": i_ds["time"]})
+                                                             "time": i_ds["time"]}, attrs=i_ds.attrs)
             out_filestr = "b.e11.BLMTRC5CN.f19_g16.{0:03d}.cam.h0.{1:s}.0850{2:02d}-2004{2:02d}.nc"
             out_filename = join(out_path,
                                 out_filestr.format(member,
