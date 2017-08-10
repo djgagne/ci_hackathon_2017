@@ -1,0 +1,15 @@
+#!/bin/bash
+#BSUB -P NWSA0001
+#BSUB -W 12:00
+#BSUB -n 32
+#BSUB -J lme_data
+#BSUB -o log_lme_data.o%J
+#BSUB -e log_lme_data.o%J
+#BSUB -q geyser
+#BSUB -B
+#BSUB -N
+cd /glade/u/home/dgagne
+source .bash_profile
+source activate hail
+cd ci_hackathon_2017/scripts
+python -u process_lme_data.py 

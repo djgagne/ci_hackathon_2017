@@ -4,15 +4,18 @@ import xarray as xr
 from multiprocessing import Pool
 from os.path import exists, join
 from numba import jit
+from os import mkdir
 
 
 def main():
-    num_procs = 12
+    num_procs = 32
     pool = Pool(num_procs, maxtasksperchild=1)
     members = np.arange(2, 14)
     lme_month_dir = "/glade/p/cesm0005/CESM-CAM5-LME/atm/proc/tseries/monthly/"
     lme_daily_dir = "/glade/p/cesm0005/CESM-CAM5-LME/atm/proc/tseries/daily/"
     out_path = "/glade/scratch/dgagne/ci_hackathon_2017/"
+    if not exists(out_path):
+        mkdir(out_path)
     output_variable = "PRECT"
     input_variables = ["PSL", "TROP_P", "TROP_T", "TS", "PS", "PRECT", "Q", "T", "U", "V", "Z3"]
     pres_vars = ["Q", "T", "U", "V", "Z3"]
@@ -61,6 +64,7 @@ def process_lme_member(member, input_variable, input_month, monthly_path, out_pa
                            input_variable,
                            "b.e11.BLMTRC5CN.f19_g16.{0:03d}.cam.h0.{1:s}.185001-200512.nc".format(member,
                                                                                                   input_variable))
+    print("Starting {0:d} {1}".format(member, input_variable))
     if exists(preind_run_file) and exists(postind_run_file):
         preind_ds = xr.open_dataset(preind_run_file)
         postind_ds = xr.open_dataset(postind_run_file)
@@ -83,6 +87,7 @@ def process_lme_member(member, input_variable, input_month, monthly_path, out_pa
         for var in preind_ds.variables.keys():
             if var not in [input_variable, "date", "time", "datesec"]:
                 data_dict[var] = preind_ds[var]
+        print("Saving {0:d} {1}".format(member, input_variable))
         out_data = xr.Dataset(data_vars=data_dict,
                               coords={"lat":lat, "lon": lon, "time": all_times[valid_months],
                                       "lev": preind_ds["lev"]}, attrs=preind_ds.attrs)
@@ -91,6 +96,8 @@ def process_lme_member(member, input_variable, input_month, monthly_path, out_pa
                                                                     "complevel": 2}})
         preind_ds.close()
         postind_ds.close()
+    else:
+        print(member + " " + input_variable + " does not exist")
     return
 
 
@@ -118,6 +125,7 @@ def calc_seasonal_precip(site_lon, site_lat, member, precip_var, precip_months, 
                             precip_var,
                             "b.e11.BLMTRC5CN.f19_g16.{0:03d}.cam.h1.{1:s}.18500101-20051231.nc".format(member,
                                                                                                       precip_var))
+    print("Starting precip calc for {0:d}".format(member))
     if exists(preind_run_file) and exists(postind_run_file):
         preind_ds = xr.open_dataset(preind_run_file)
         postind_ds = xr.open_dataset(postind_run_file)
@@ -144,6 +152,8 @@ def calc_seasonal_precip(site_lon, site_lat, member, precip_var, precip_months, 
         season_name = "".join([month_to_letter[x] for x in precip_months])
         out_file = join(out_path, "{0:s}_precip_lme_cam_{1:03d}_{2:s}_0851-2005.csv".format(season_name,
                                                                                             member, precip_var))
+        
+        print("Saving {0:d} precip".format(member))
         seasonal_precip.to_csv(out_file, index_label="Year")
     return
 
@@ -159,6 +169,7 @@ def precipitable_water(member, input_month, data_path, out_path, pres_var="PS", 
                                                                                                    q_var,
                                                                                                    input_month))
     if exists(pres_file) and exists(q_file):
+        print("Starting precipitable water {0:d}".format(member))
         pres_ds = xr.open_dataset(pres_file)
         q_ds = xr.open_dataset(q_file)
         pw_field = np.zeros(pres_ds.shape, dtype=np.float32)
@@ -166,6 +177,7 @@ def precipitable_water(member, input_month, data_path, out_path, pres_var="PS", 
         bi = q_ds["hybi"].values
         p0 = q_ds["P0"].values
         for t in range(q_ds[q_var].shape[0]):
+            print("PW {0:02d} {1:03d}".format(member, t))
             q_field = q_ds[q_var][t].values
             pres_field = pres_ds[pres_var][t].values
             for (i, j), pres in np.ndenumerate(pres_field):
@@ -176,6 +188,7 @@ def precipitable_water(member, input_month, data_path, out_path, pres_var="PS", 
         for var in q_ds.variables.keys():
             if var not in [q_var]:
                 data_dict[var] = q_ds[var]
+        print("Saving PW {0:02d}".format(member))
         pw_ds = xr.Dataset(data_vars=data_dict, coords={"lat": q_ds["lat"],
                                                         "lon": q_ds["lon"],
                                                         "time": q_ds["time"],
@@ -204,6 +217,7 @@ def interp_pressure(interp_var, pressure_levels, member, input_month, data_path,
                                                                                                  interp_var,
                                                                                                  input_month))
     if exists(pres_file) and exists(i_file):
+        print("Starting pressure interp {0:02d} {1}".format(member, interp_var))
         pres_ds = xr.open_dataset(pres_file)
         i_ds = xr.open_dataset(i_file)
         pres_level_field = np.zeros([len(pressure_levels)] + list(pres_ds.shape), dtype=np.float32)
@@ -211,11 +225,13 @@ def interp_pressure(interp_var, pressure_levels, member, input_month, data_path,
         bm = i_ds["hybm"].values
         p0 = i_ds["P0"].values
         for t in range(i_ds[interp_var].shape[0]):
+            print("Pressure interp {0:02d} {1} t={2:03d}".format(member, interp_var, t))
             i_field = i_ds[interp_var][t].values
             pres_field = pres_ds[pres_var][t].values
             for (i, j), pres in np.ndenumerate(pres_field):
                 pres_m_levels = am * p0 + bm * pres
-                pres_level_field[:, t, i, j] = np.interp(pres_m_levels, i_field[:, i, j], pressure_levels * 100)
+                pres_level_field[:, t, i, j] = np.interp(pres_m_levels, i_field[:, i, j], pressure_levels * 100) 
+        print("Saving pressure interp {0:02d} {1}".format(member, interp_var))
         for p, pressure_level in enumerate(pressure_levels):
             out_var = interp_var + "_{0:d}".format(int(pressure_level))
             data_dict = {out_var: pres_level_field[p]}
