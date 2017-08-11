@@ -1,7 +1,7 @@
 #!/bin/bash
 #BSUB -P NWSA0001
 #BSUB -W 12:00
-#BSUB -n 32
+#BSUB -n 36
 #BSUB -J lme_data
 #BSUB -o log_lme_data.o%J
 #BSUB -e log_lme_data.o%J
